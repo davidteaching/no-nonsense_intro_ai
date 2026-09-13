@@ -286,6 +286,178 @@ plt.savefig('fig05_steps.png', dpi=150, bbox_inches='tight')
 plt.show()
 
 # %% [markdown]
+# ### 4.4 — What if the labels are wrong?
+#
+# Every experiment so far has used the correct labels. This one asks what
+# happens when the labels are deliberately corrupted. There are two
+# cases, and they behave very differently.
+#
+# **Case A — a systematic permutation.** Relabel every digit as another:
+# 0 becomes 9, 1 becomes 8, and so on. The mapping is consistent: every
+# 0 in the dataset is now labeled 9.
+#
+# **Case B — random labels.** Assign each training example a uniformly
+# random label, independent of the image. The mapping is inconsistent:
+# the same digit might be labeled 3 in one example and 7 in another.
+#
+# The difference between the two cases is not the model, the optimizer,
+# or the data. It is whether the mapping from inputs to labels has any
+# structure to learn. The experiment makes that distinction visible.
+
+# %%
+def train_logreg_full(lr, n_steps, X, y):
+    """Train logistic regression from scratch. Returns weights, bias, losses."""
+    W = np.zeros((784, 10), dtype=np.float32)
+    b = np.zeros(10, dtype=np.float32)
+    losses = []
+    for _ in range(n_steps):
+        loss, gW, gb = loss_and_grad(W, b, X, y)
+        W -= lr * gW
+        b -= lr * gb
+        losses.append(loss)
+    return W, b, losses
+
+
+# (a) Original labels: the baseline
+W_orig, b_orig, losses_orig = train_logreg_full(0.5, 2000, X_train, y_train)
+acc_orig = accuracy(W_orig, b_orig, X_test, y_test)
+
+# (b) Systematic permutation: 0->9, 1->8, 2->7, 3->6, 4->5, and back
+perm = np.array([9, 8, 7, 6, 5, 4, 3, 2, 1, 0])
+y_train_perm = perm[y_train]
+y_test_perm  = perm[y_test]
+W_perm, b_perm, losses_perm = train_logreg_full(0.5, 2000, X_train, y_train_perm)
+acc_perm = accuracy(W_perm, b_perm, X_test, y_test_perm)
+
+# (c) Random labels
+rng = np.random.default_rng(0)
+y_train_rand = rng.integers(0, 10, size=len(y_train)).astype(np.int64)
+y_test_rand  = rng.integers(0, 10, size=len(y_test)).astype(np.int64)
+W_rand, b_rand, losses_rand = train_logreg_full(0.5, 2000, X_train, y_train_rand)
+acc_rand  = accuracy(W_rand, b_rand, X_test, y_test_rand)
+acc_rand_train = accuracy(W_rand, b_rand, X_train, y_train_rand)
+
+print(f"original labels:       test acc = {acc_orig:.4f}")
+print(f"permuted labels:       test acc = {acc_perm:.4f}")
+print(f"random labels:         test acc = {acc_rand:.4f}")
+print(f"random labels:         train acc = {acc_rand_train:.4f}")
+
+# %% [markdown]
+# The three numbers tell the story:
+#
+# - **Original labels**: 92% test accuracy, as before.
+# - **Permuted labels**: 92% test accuracy. The permutation is learned
+#   perfectly. Nothing about the problem changed except which symbol
+#   each pattern maps to, and the model learned the new mapping as
+#   easily as the old one.
+# - **Random labels**: 10% test accuracy — chance for ten classes.
+#   Training accuracy is also around 10–15%: the linear model cannot
+#   even fit the training data, because there is no consistent pattern
+#   to fit.
+#
+# The difference between (b) and (c) is not in the model or the training
+# procedure. It is entirely in whether the input-to-label mapping has
+# structure.
+
+# %%
+fig, ax = plt.subplots()
+ax.plot(losses_orig, label='original labels')
+ax.plot(losses_perm, label='permuted labels (0↔9, 1↔8, ...)')
+ax.plot(losses_rand, label='random labels')
+ax.set_xlabel('step')
+ax.set_ylabel('training loss')
+ax.set_yscale('log')
+ax.set_title('Loss curves: original, permuted, and random labels')
+ax.legend()
+plt.savefig('fig04d_label_swap_curves.png', dpi=150, bbox_inches='tight')
+plt.show()
+
+# %% [markdown]
+# The permuted-label curve is indistinguishable from the original. Same
+# shape, same rate of descent, same final loss. The random-label curve
+# plateaus early at a much higher value and stays there — the model
+# cannot reduce the loss because there is no consistent signal to
+# learn from.
+#
+# This is the strongest possible demonstration of a claim in
+# Section 2 of the article: **the model has no idea what the labels
+# mean**. "0" and "9" are arbitrary symbols. The model learns a
+# function from inputs to symbols. When the mapping is a permutation,
+# the function exists and is learnable. When the mapping is random,
+# the function does not exist.
+
+# %%
+fig, axes = plt.subplots(2, 5, figsize=(13, 5.5))
+for i in range(10):
+    ax = axes.flat[i]
+    ax.imshow(W_perm[:, i].reshape(28, 28), cmap='RdBu_r', vmin=-0.5, vmax=0.5)
+    ax.set_title(f'class {i}\n(originally {perm[i]})', fontsize=9)
+    ax.axis('off')
+fig.suptitle('Learned templates under permuted labels')
+plt.tight_layout()
+plt.savefig('fig04e_permuted_templates.png', dpi=150, bbox_inches='tight')
+plt.show()
+
+# %% [markdown]
+# Each learned template is the same digit it was before, but it now
+# represents a different class. The template that used to represent 0
+# now represents 9, because under the permutation every 0 was relabeled
+# as 9. The model learned exactly what it was told to learn.
+#
+# A human reader looking at these templates would find them confusing:
+# "why is that 0 labeled 9?" A model has no such confusion, because it
+# has no prior belief about what the labels mean. This is a real
+# difference between the model and a human, and it is not a small one.
+
+# %%
+# Cross-evaluation: how does the permuted model perform on the *original* task?
+acc_perm_on_orig = accuracy(W_perm, b_perm, X_test, y_test)
+print(f"permuted model, evaluated on original labels:  {acc_perm_on_orig:.4f}")
+
+# %% [markdown]
+# Nearly zero. The permuted model predicts `perm[y]` for an input whose
+# true class is `y`. Since the permutation has no fixed points
+# (`perm[i] ≠ i` for all `i`), every prediction is wrong except where
+# the model is wrong in a way that lands on the correct answer by
+# accident. The model is a faithful representation of the permuted
+# task, and therefore a completely wrong representation of the original
+# one.
+
+# %% [markdown]
+# **What this experiment teaches.**
+#
+# Three lessons, each corresponding to a claim in the article.
+#
+# 1. **The model has no semantic understanding of the labels.** It
+#    learns a function from inputs to symbols. The symbols are
+#    arbitrary; the function is what matters. This is the empirical
+#    form of the claim in Section 2 that current AI is not conscious
+#    and does not understand in the human sense.
+#
+# 2. **Learning requires structure in the mapping.** A permutation has
+#    structure; a random assignment does not. The same model, trained
+#    the same way, achieves 92% on one and 10% on the other. The
+#    difference is in the data, not the algorithm.
+#
+# 3. **A model that fits its training labels perfectly is not
+#    necessarily useful.** The permuted model perfectly fits its
+#    (permuted) training set. On the original task, its accuracy is
+#    near zero. This is a preview of the overfitting discussion in
+#    Section 5: fitting is not the same as understanding.
+#
+# **A note on the next section.**
+#
+# With a linear model, the random-label case fails at training: the
+# model cannot even fit the noise, because it lacks the capacity. In
+# the next part, we add a hidden layer and see something different.
+# A nonlinear network *can* memorise 60,000 random labels perfectly —
+# 100% training accuracy — while still performing at chance on the
+# test set. That is the purest form of overfitting, and it is why
+# "the model achieved 99% on the training set" is not, by itself, an
+# informative statement. We return to this experiment with the MLP
+# in Part 5.
+
+# %% [markdown]
 # ## Part 5 — Why nonlinearity matters
 #
 # We add one hidden layer to the from-scratch model. Accuracy jumps.
