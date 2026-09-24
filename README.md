@@ -1,4 +1,4 @@
-# [Judul Buku Anda / Your Book Title]
+# [A No-nonsense Introduction to Artificial Intelligence]
 
 Welcome to the official repository of **[A No-nonsense Introduction to Artificial Intelligence]**! 📖
 *Selamat datang di repositori resmi buku **[A No-nonsense Introduction to Artificial Intelligence]**!*
@@ -42,4 +42,4 @@ Thank you for being part of this writing journey! 🚀
 *Terima kasih telah menjadi bagian dari perjalanan penulisan buku ini!*
 
 ---
-© [Tahun Anda] [Nama/Pena Anda]. All rights reserved / Hak cipta dilindungi undang-undang.
+© [2026] [David Hutasoit]. All rights reserved / Hak cipta dilindungi undang-undang.
